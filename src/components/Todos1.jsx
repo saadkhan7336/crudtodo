@@ -206,90 +206,111 @@
 
 // export default Todos1;
 import React, { useState } from "react";
-import {
-  useGetTodosQuery,
-  useAddTodoMutation,
-  useUpdateTodoMutation,
-  useDeleteTodoMutation,
-} from "../features/todo/apiSlice";
+import { useGetTodosQuery, useLazyGetTodoQuery } from "../features/todo/apiSlice";
 
 function Todos1() {
-  const { data: todos, isLoading, error } = useGetTodosQuery();
-  const [addTodo] = useAddTodoMutation();
-  const [updateTodo] = useUpdateTodoMutation();
-  const [deleteTodo] = useDeleteTodoMutation();
-  const [newTodo, setNewTodo] = useState("");
+  const { isLoading, error } = useGetTodosQuery();
+  const [getTodo] = useLazyGetTodoQuery();
+  const [todos, setTodos] = useState([]);
+  const [todoId, setTodoId] = useState(1);
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState("");
 
+  // Fetch and add a single todo
   const handleAddTodo = async () => {
-    if (newTodo.trim()) {
-      await addTodo({ id: Date.now(), title: newTodo, completed: false }).unwrap();
-      setNewTodo("");
+    try {
+      const { data } = await getTodo(todoId);
+      if (data) {
+        setTodos((prevTodos) => [...prevTodos, data]);
+        setTodoId(todoId + 1);
+      }
+    } catch (err) {
+      console.error("Failed to fetch todo:", err);
     }
   };
 
-  const handleUpdateTodo = async (todo) => {
-    await updateTodo({
-      id: todo.id,
-      title: todo.title + " (updated)",
-      completed: !todo.completed,
-    }).unwrap();
+  // Remove a todo
+  const handleDeleteTodo = (id) => {
+    setTodos((prevTodos) => prevTodos.filter((todo) => todo.id !== id));
   };
 
-  const handleDeleteTodo = async (id) => {
-    await deleteTodo({ id }).unwrap();
+  // Enable editing mode
+  const handleEdit = (todo) => {
+    setEditId(todo.id);
+    setEditText(todo.title);
   };
 
-  if (isLoading) return <p className="text-center text-lg">Loading...</p>;
+  // Save the edited todo
+  const handleSave = (id) => {
+    setTodos((prevTodos) =>
+      prevTodos.map((todo) =>
+        todo.id === id ? { ...todo, title: editText } : todo
+      )
+    );
+    setEditId(null);
+  };
+
+  if (isLoading) return <p className="text-center text-gray-500">Loading...</p>;
   if (error) return <p className="text-center text-red-500">Error loading todos</p>;
 
   return (
-    <div className="max-w-md mx-auto p-4 bg-gray-100 rounded-lg shadow-lg mt-5">
-      <h1 className="text-2xl font-bold text-center mb-4">Todos</h1>
+    <div className="min-h-screen flex flex-col items-center bg-gray-100 p-6 sm:p-8">
+      <div className="bg-white shadow-lg rounded-xl p-6 sm:p-8 w-full max-w-md">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4 text-center">Todos</h1>
 
-      {/* Input & Add Button */}
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={newTodo}
-          onChange={(e) => setNewTodo(e.target.value)}
-          placeholder="Enter new todo"
-          className="w-full p-2 border border-gray-300 rounded-md"
-        />
+        {/* Add Todo Button */}
         <button
           onClick={handleAddTodo}
-          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
+          className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition-all"
         >
-          Add
+          Add Todo
         </button>
-      </div>
 
-      {/* Todo List */}
-      <ul className="space-y-3">
-        {todos?.map((todo) => (
-          <li
-            key={todo.id}
-            className="flex items-center justify-between bg-white p-3 rounded-md shadow-md"
-          >
-            <span
-              className={`flex-1 ${todo.completed ? "line-through text-gray-500" : ""}`}
+        {/* Todos List */}
+        <ul className="mt-4 space-y-2">
+          {todos.map((todo) => (
+            <li
+              key={todo.id}
+              className="flex flex-col sm:flex-row items-center justify-between bg-gray-200 p-3 rounded-md shadow-sm"
             >
-              {todo.title}
-            </span>
-            <button
-              onClick={() => handleUpdateTodo(todo)}
-              className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600 transition"
-            >
-              Update
-            </button>
-            <button
-              onClick={() => handleDeleteTodo(todo.id)}
-              className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition"
-            >
-              Delete
-            </button>
-          </li>
-        ))}
-      </ul>
+              {editId === todo.id ? (
+                <input
+                  type="text"
+                  className="flex-1 px-2 py-1 border text-black rounded-md"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                />
+              ) : (
+                <span className="text-gray-800 text-center sm:text-left">{todo.title}</span>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">
+                {editId === todo.id ? (
+                  <button
+                    onClick={() => handleSave(todo.id)}
+                    className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md transition-all"
+                  >
+                    Save
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleEdit(todo)}
+                    className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md transition-all"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDeleteTodo(todo.id)}
+                  className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-all"
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
